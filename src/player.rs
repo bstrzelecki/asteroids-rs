@@ -3,6 +3,7 @@ use leafwing_input_manager::{
     prelude::{ActionState, InputMap},
     Actionlike, InputManagerBundle,
 };
+use strum::{EnumIter, IntoEnumIterator};
 
 use crate::{
     ProjectileSprite, Velocity, WrapTimeout, ACC_SPEED, MAX_VELOCITY, PROJECTILE_SPEED,
@@ -16,8 +17,13 @@ pub struct Player {
     projectile_spawn_delay: Timer,
 }
 
-#[derive(Component)]
-pub struct PlayerShadow(pub u8);
+#[derive(Component, EnumIter)]
+pub enum PlayerShadow {
+    Left,
+    Right,
+    Top,
+    Bottom,
+}
 
 #[derive(Actionlike, Debug, Clone, Eq, PartialEq, Hash, Reflect)]
 pub enum PlayerAction {
@@ -50,12 +56,12 @@ fn setup(
         Player::default(),
         InputManagerBundle::<PlayerAction>::with_map(Player::default_input_map()),
     ));
-    for i in 0..4 {
+    for shadow in PlayerShadow::iter() {
         cmd.spawn((
             player_mesh.clone(),
             MeshMaterial2d(materials.add(Color::linear_rgb(256.0, 0.0, 0.0))),
             Transform::from_xyz(0.0, 0.0, 0.0),
-            PlayerShadow(i),
+            shadow,
         ));
     }
 }
@@ -151,21 +157,18 @@ pub fn apply_shadow(
 ) {
     let player = player.single();
     shadows.iter_mut().for_each(|(mut it, shadow)| {
+        use PlayerShadow::*;
         it.translation = player.translation
             + Vec3::new(
-                if shadow.0 == 0 {
-                    -WINDOW_WIDTH
-                } else if shadow.0 == 1 {
-                    WINDOW_WIDTH
-                } else {
-                    0.0
+                match shadow {
+                    Left => -WINDOW_WIDTH,
+                    Right => WINDOW_WIDTH,
+                    _ => 0.0,
                 },
-                if shadow.0 == 2 {
-                    -WINDOW_HEIGHT
-                } else if shadow.0 == 3 {
-                    WINDOW_HEIGHT
-                } else {
-                    0.0
+                match shadow {
+                    Bottom => WINDOW_HEIGHT,
+                    Top => -WINDOW_HEIGHT,
+                    _ => 0.0,
                 },
                 0.0,
             );
