@@ -1,24 +1,63 @@
 use bevy::{prelude::*, time::Timer};
 use leafwing_input_manager::{
     prelude::{ActionState, InputMap},
-    Actionlike,
+    Actionlike, InputManagerBundle,
 };
 
 use crate::{
     ProjectileSprite, Velocity, WrapTimeout, ACC_SPEED, MAX_VELOCITY, PROJECTILE_SPEED,
-    ROTATION_SPEED, SHOOT_TIMEOUT,
+    ROTATION_SPEED, SHOOT_TIMEOUT, WINDOW_HEIGHT, WINDOW_WIDTH,
 };
+
+pub struct PlayerPlugin;
 
 #[derive(Component)]
 pub struct Player {
     projectile_spawn_delay: Timer,
 }
 
+#[derive(Component)]
+pub struct PlayerShadow(pub u8);
+
 #[derive(Actionlike, Debug, Clone, Eq, PartialEq, Hash, Reflect)]
 pub enum PlayerAction {
     Forward,
     Shoot,
     Rotate(i8),
+}
+
+impl Plugin for PlayerPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_systems(Startup, setup)
+            .add_systems(Update, (player_input, apply_shadow, shoot_projectile));
+    }
+}
+fn setup(
+    mut cmd: Commands,
+    mut meshes: ResMut<Assets<Mesh>>,
+    mut materials: ResMut<Assets<ColorMaterial>>,
+) {
+    let player_mesh = Mesh2d(meshes.add(Triangle2d::new(
+        Vec2::new(0.0, 50.0),
+        Vec2::new(-50.0, -50.0),
+        Vec2::new(50.0, -50.0),
+    )));
+    cmd.spawn((
+        player_mesh.clone(),
+        MeshMaterial2d(materials.add(Color::linear_rgb(256.0, 0.0, 0.0))),
+        Transform::from_xyz(0.0, 0.0, 0.0),
+        Velocity { x: 0.0, y: 0.0 },
+        Player::default(),
+        InputManagerBundle::<PlayerAction>::with_map(Player::default_input_map()),
+    ));
+    for i in 0..4 {
+        cmd.spawn((
+            player_mesh.clone(),
+            MeshMaterial2d(materials.add(Color::linear_rgb(256.0, 0.0, 0.0))),
+            Transform::from_xyz(0.0, 0.0, 0.0),
+            PlayerShadow(i),
+        ));
+    }
 }
 
 impl Default for Player {
@@ -104,4 +143,32 @@ pub fn shoot_projectile(
     } else {
         warn!("Projectile material not loaded");
     }
+}
+
+pub fn apply_shadow(
+    player: Query<&Transform, With<Player>>,
+    mut shadows: Query<(&mut Transform, &PlayerShadow), Without<Player>>,
+) {
+    let player = player.single();
+    shadows.iter_mut().for_each(|(mut it, shadow)| {
+        it.translation = player.translation
+            + Vec3::new(
+                if shadow.0 == 0 {
+                    -WINDOW_WIDTH
+                } else if shadow.0 == 1 {
+                    WINDOW_WIDTH
+                } else {
+                    0.0
+                },
+                if shadow.0 == 2 {
+                    -WINDOW_HEIGHT
+                } else if shadow.0 == 3 {
+                    WINDOW_HEIGHT
+                } else {
+                    0.0
+                },
+                0.0,
+            );
+        it.rotation = player.rotation;
+    });
 }
