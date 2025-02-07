@@ -1,3 +1,5 @@
+use std::time::Duration;
+
 use bevy::{prelude::*, render::camera::ScalingMode};
 use leafwing_input_manager::plugin::InputManagerPlugin;
 use player::PlayerPlugin;
@@ -10,7 +12,7 @@ fn main() {
         .add_plugins(InputManagerPlugin::<player::PlayerAction>::default())
         .add_plugins(PlayerPlugin)
         .add_systems(Startup, setup)
-        .add_systems(Update, (apply_velocity, wrap_around))
+        .add_systems(Update, (apply_velocity, wrap_around, spawn_asteroid))
         .run();
 }
 
@@ -26,6 +28,45 @@ const WINDOW_HEIGHT: f32 = 1080.0;
 
 #[derive(Resource)]
 struct ProjectileSprite(Handle<ColorMaterial>, Handle<Mesh>);
+
+#[derive(Component)]
+struct AsteroidSpawner {
+    timer: Timer,
+    material: Handle<ColorMaterial>,
+    mesh: Handle<Mesh>,
+}
+
+impl AsteroidSpawner {
+    fn new(mesh: Handle<Mesh>, material: Handle<ColorMaterial>) -> Self {
+        Self {
+            timer: Timer::new(Duration::from_secs(1), TimerMode::Once),
+            mesh,
+            material,
+        }
+    }
+    fn spawn(&self, cmd: &mut Commands) {
+        cmd.spawn((
+            Transform::from_xyz(1920.0, 1080.0, 0.0),
+            Velocity {
+                x: 2.0 - 1.0,
+                y: 1.0,
+            },
+            Mesh2d(self.mesh.clone()),
+            MeshMaterial2d(self.material.clone()),
+            WrapTimeout(5),
+        ));
+    }
+}
+
+fn spawn_asteroid(mut cmd: Commands, time: Res<Time>, mut spawner: Query<(&mut AsteroidSpawner)>) {
+    let (mut spawner) = spawner.single_mut();
+    spawner.timer.tick(time.delta());
+
+    if spawner.timer.finished() {
+        spawner.spawn(&mut cmd);
+        spawner.timer.reset();
+    }
+}
 
 fn setup(
     mut cmd: Commands,
@@ -48,13 +89,9 @@ fn setup(
         Transform::from_xyz(WINDOW_WIDTH / 2.0, WINDOW_HEIGHT / 2.0, 0.0),
     ));
 
-    let mesh = Mesh2d(meshes.add(Circle::new(20.0)));
-    cmd.spawn((
-        mesh,
-        MeshMaterial2d(materials.add(Color::linear_rgb(256.0, 0.0, 0.0))),
-        Transform::from_xyz(50.0, 50.0, 00.0),
-        Velocity { x: -3.0, y: 1.0 },
-    ));
+    let asteroid_mesh = meshes.add(Circle::new(20.0));
+    let asteroid_mat = materials.add(Color::linear_rgb(256.0, 0.0, 0.0));
+    cmd.spawn((AsteroidSpawner::new(asteroid_mesh, asteroid_mat),));
 }
 
 #[derive(Component)]
