@@ -13,3 +13,8 @@ opt-level = 3
 bevy = { version="0.15", features=["wayland", "dynamic_linking"] }
 leafwing-input-manager = { version = "0.16.0" }
 strum = { version = "0.26", features = ["derive"] }
+rand = "0.9"
+bevy_rand = { version = "0.9", features = ["rand_chacha", "wyrand"] }
+bevy_prng = { version = "0.9", features = ["rand_chacha", "wyrand"] }
+bevy_spatial = "0.10"
+bevy_hanabi = "0.14"
