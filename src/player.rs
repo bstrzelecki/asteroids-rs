@@ -6,8 +6,8 @@ use leafwing_input_manager::{
 use strum::{EnumIter, IntoEnumIterator};
 
 use crate::{
-    ProjectileSprite, Velocity, WrapTimeout, ACC_SPEED, MAX_VELOCITY, PROJECTILE_SPEED,
-    ROTATION_SPEED, SHOOT_TIMEOUT, WINDOW_HEIGHT, WINDOW_WIDTH,
+    CircleCollider, ProjectileSprite, Velocity, WrapTimeout, ACC_SPEED, MAX_VELOCITY,
+    PROJECTILE_SPEED, ROTATION_SPEED, SHOOT_TIMEOUT, WINDOW_HEIGHT, WINDOW_WIDTH,
 };
 
 pub struct PlayerPlugin;
@@ -51,7 +51,7 @@ fn setup(
     cmd.spawn((
         player_mesh.clone(),
         MeshMaterial2d(materials.add(Color::linear_rgb(256.0, 0.0, 0.0))),
-        Transform::from_xyz(0.0, 0.0, 0.0),
+        Transform::from_xyz(WINDOW_WIDTH / 2.0, WINDOW_HEIGHT / 2.0, 0.0),
         Velocity { x: 0.0, y: 0.0 },
         Player::default(),
         InputManagerBundle::<PlayerAction>::with_map(Player::default_input_map()),
@@ -143,6 +143,7 @@ pub fn shoot_projectile(
                     y: velocity.y + direction.y * PROJECTILE_SPEED,
                 },
                 WrapTimeout(1),
+                CircleCollider::new(10.0),
             ));
             timer.projectile_spawn_delay.reset();
         }
