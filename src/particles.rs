@@ -1,9 +1,9 @@
-use bevy::app::{App, Plugin, Startup, Update};
+use bevy::app::{App, Plugin, Startup};
 use bevy::prelude::*;
 use bevy_hanabi::{
-    Attribute, ColorOverLifetimeModifier, EffectAsset, EffectProperties, ExprWriter, Gradient,
-    HanabiPlugin, ParticleEffect, ParticleEffectBundle, ScalarType, SetAttributeModifier,
-    SetPositionSphereModifier, SetVelocitySphereModifier, ShapeDimension, Spawner,
+    Attribute, ColorOverLifetimeModifier, EffectAsset, ExprWriter, Gradient, HanabiPlugin,
+    ScalarType, SetAttributeModifier, SetPositionSphereModifier, SetVelocitySphereModifier,
+    ShapeDimension, Spawner,
 };
 
 pub struct ParticlePlugin;
@@ -11,7 +11,6 @@ pub struct ParticlePlugin;
 impl Plugin for ParticlePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, setup)
-            .add_systems(Update, (player_input, apply_shadow, shoot_projectile))
             .init_resource::<CollisionEffect>()
             .add_plugins(HanabiPlugin);
     }
