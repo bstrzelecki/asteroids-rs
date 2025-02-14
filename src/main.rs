@@ -30,6 +30,7 @@ fn main() {
         .add_systems(Startup, setup)
         .add_systems(Update, (apply_velocity, wrap_around, check_collisions))
         .add_event::<CollisionEvent>()
+        .add_observer(update_score)
         .run();
 }
 
@@ -68,6 +69,13 @@ type NNTree = KDTree2<SpatialMarker>;
 
 #[derive(Event)]
 struct CollisionEvent(Entity, Entity);
+
+fn update_score(event: Trigger<OnScoreUpdate>, mut text: Query<(&mut Text, &mut Score)>) {
+    text.iter_mut().for_each(|(mut text, mut score)| {
+        score.0 += event.0;
+        text.0 = format!("Score: {}", score.0);
+    });
+}
 
 fn check_collisions(
     e: Query<(Entity, &Transform, &CircleCollider)>,
@@ -108,10 +116,44 @@ fn setup(
         }),
         Transform::from_xyz(WINDOW_WIDTH / 2.0, WINDOW_HEIGHT / 2.0, 0.0),
     ));
+    cmd.spawn(Node {
+        width: Val::Percent(100.0),
+        height: Val::Percent(100.0),
+        align_items: AlignItems::Start,
+        justify_content: JustifyContent::Center,
+        padding: UiRect {
+            left: Val::Px(0.0),
+            right: Val::Px(0.0),
+            top: Val::Px(10.0),
+            bottom: Val::Px(0.0),
+        },
+        ..default()
+    })
+    .with_child((Text::new("Score: 0"), Score::default()));
+    cmd.spawn(Node {
+        width: Val::Percent(100.0),
+        height: Val::Percent(100.0),
+        align_items: AlignItems::Start,
+        justify_content: JustifyContent::Start,
+        padding: UiRect {
+            left: Val::Px(10.0),
+            right: Val::Px(0.0),
+            top: Val::Px(10.0),
+            bottom: Val::Px(0.0),
+        },
+        ..default()
+    })
+    .with_child(Text::new("X X X"));
 }
 
 #[derive(Component)]
 struct WrapTimeout(u8);
+
+#[derive(Component, Default)]
+struct Score(u32);
+
+#[derive(Event)]
+struct OnScoreUpdate(u32);
 
 fn wrap_around(
     mut e: Query<(Entity, &mut Transform, Option<&mut WrapTimeout>), With<Velocity>>,

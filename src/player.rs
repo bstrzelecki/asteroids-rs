@@ -1,13 +1,14 @@
 use bevy::{prelude::*, time::Timer};
 use leafwing_input_manager::{
-    prelude::{ActionState, InputMap},
     Actionlike, InputManagerBundle,
+    prelude::{ActionState, InputMap},
 };
 use strum::{EnumIter, IntoEnumIterator};
 
 use crate::{
-    CircleCollider, ProjectileSprite, Velocity, WrapTimeout, ACC_SPEED, MAX_VELOCITY,
-    PROJECTILE_SPEED, ROTATION_SPEED, SHOOT_TIMEOUT, WINDOW_HEIGHT, WINDOW_WIDTH,
+    ACC_SPEED, CircleCollider, CollisionEvent, MAX_VELOCITY, OnScoreUpdate, PROJECTILE_SPEED,
+    ProjectileSprite, ROTATION_SPEED, SHOOT_TIMEOUT, Velocity, WINDOW_HEIGHT, WINDOW_WIDTH,
+    WrapTimeout,
 };
 
 pub struct PlayerPlugin;
@@ -34,8 +35,15 @@ pub enum PlayerAction {
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup)
-            .add_systems(Update, (player_input, apply_shadow, shoot_projectile));
+        app.add_systems(Startup, setup).add_systems(
+            Update,
+            (
+                player_input,
+                apply_shadow,
+                shoot_projectile,
+                resolve_bullet_collisions,
+            ),
+        );
     }
 }
 fn setup(
@@ -95,10 +103,10 @@ impl Player {
 }
 
 pub fn player_input(
-    mut player: Query<(&mut Velocity, &mut Transform, &ActionState<PlayerAction>), With<Player>>,
+    player: Single<(&mut Velocity, &mut Transform, &ActionState<PlayerAction>), With<Player>>,
     time: Res<Time>,
 ) {
-    let (mut velocity, mut transform, action_state) = player.single_mut();
+    let (mut velocity, mut transform, action_state) = player.into_inner();
     let direction = transform.rotation * Vec3::Y;
     let translation = direction * ACC_SPEED * time.delta().as_secs_f32();
 
@@ -115,8 +123,11 @@ pub fn player_input(
     }
 }
 
+#[derive(Component)]
+struct ScoreMarker;
+
 pub fn shoot_projectile(
-    mut player: Query<(
+    player: Single<(
         &Transform,
         &Velocity,
         &ActionState<PlayerAction>,
@@ -127,7 +138,7 @@ pub fn shoot_projectile(
     material: Option<Res<ProjectileSprite>>,
 ) {
     if let Some(material) = material {
-        let (player, velocity, action_state, mut timer) = player.single_mut();
+        let (player, velocity, action_state, mut timer) = player.into_inner();
         timer.projectile_spawn_delay.tick(time.delta());
 
         if action_state.just_pressed(&PlayerAction::Shoot)
@@ -144,6 +155,7 @@ pub fn shoot_projectile(
                 },
                 WrapTimeout(1),
                 CircleCollider::new(10.0),
+                ScoreMarker,
             ));
             timer.projectile_spawn_delay.reset();
         }
@@ -153,10 +165,10 @@ pub fn shoot_projectile(
 }
 
 pub fn apply_shadow(
-    player: Query<&Transform, With<Player>>,
+    player: Single<&Transform, With<Player>>,
     mut shadows: Query<(&mut Transform, &PlayerShadow), Without<Player>>,
 ) {
-    let player = player.single();
+    let player = player.into_inner();
     shadows.iter_mut().for_each(|(mut it, shadow)| {
         use PlayerShadow::*;
         it.translation = player.translation
@@ -175,4 +187,38 @@ pub fn apply_shadow(
             );
         it.rotation = player.rotation;
     });
+}
+
+fn resolve_bullet_collisions(
+    mut e: EventReader<CollisionEvent>,
+    mut cmd: Commands,
+    asteroids: Query<(
+        &WrapTimeout,
+        &Transform,
+        Option<&crate::asteroid::LargeAsteroid>,
+    )>,
+    bullet: Query<&ScoreMarker>,
+) {
+    for ev in e.read() {
+        if let Ok((_, _, is_large)) = asteroids.get(ev.0) {
+            if bullet.get(ev.1).is_ok() {
+                dbg!("bullet hit asteroid");
+                if is_large.is_some() {
+                    cmd.trigger(OnScoreUpdate(25));
+                } else {
+                    cmd.trigger(OnScoreUpdate(10));
+                }
+            }
+        }
+        if let Ok((_, _, is_large)) = asteroids.get(ev.1) {
+            if bullet.get(ev.0).is_ok() {
+                dbg!("bullet hit asteroid");
+                if is_large.is_some() {
+                    cmd.trigger(OnScoreUpdate(25));
+                } else {
+                    cmd.trigger(OnScoreUpdate(10));
+                }
+            }
+        }
+    }
 }

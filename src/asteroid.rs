@@ -47,7 +47,7 @@ fn setup(
 }
 
 #[derive(Component)]
-struct LargeAsteroid;
+pub struct LargeAsteroid;
 
 impl AsteroidSpawner {
     fn new(
