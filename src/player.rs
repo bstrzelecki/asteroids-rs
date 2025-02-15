@@ -35,15 +35,19 @@ pub enum PlayerAction {
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup).add_systems(
-            Update,
-            (
-                player_input,
-                apply_shadow,
-                shoot_projectile,
-                resolve_bullet_collisions,
-            ),
-        );
+        app.add_systems(Startup, setup)
+            .add_systems(
+                Update,
+                (
+                    player_input,
+                    apply_shadow,
+                    shoot_projectile,
+                    resolve_bullet_collisions,
+                    resolve_player_collisions,
+                    clear_player_grace,
+                ),
+            )
+            .add_observer(player_grace);
     }
 }
 fn setup(
@@ -63,6 +67,7 @@ fn setup(
         Velocity { x: 0.0, y: 0.0 },
         Player::default(),
         InputManagerBundle::<PlayerAction>::with_map(Player::default_input_map()),
+        CircleCollider::new(15.0),
     ));
     for shadow in PlayerShadow::iter() {
         cmd.spawn((
@@ -168,7 +173,6 @@ pub fn apply_shadow(
     player: Single<&Transform, With<Player>>,
     mut shadows: Query<(&mut Transform, &PlayerShadow), Without<Player>>,
 ) {
-    let player = player.into_inner();
     shadows.iter_mut().for_each(|(mut it, shadow)| {
         use PlayerShadow::*;
         it.translation = player.translation
@@ -187,6 +191,55 @@ pub fn apply_shadow(
             );
         it.rotation = player.rotation;
     });
+}
+
+#[derive(Event)]
+pub struct OnPlayerDamage;
+
+#[derive(Component)]
+struct PlayerGrace {
+    timer: Timer,
+}
+
+impl Default for PlayerGrace {
+    fn default() -> Self {
+        Self {
+            timer: Timer::from_seconds(1.0, TimerMode::Once),
+        }
+    }
+}
+
+fn resolve_player_collisions(
+    mut e: EventReader<CollisionEvent>,
+    mut cmd: Commands,
+    player: Query<Entity, (With<Player>, Without<PlayerGrace>)>,
+) {
+    for ev in e.read() {
+        if player.get(ev.0).is_ok() || player.get(ev.1).is_ok() {
+            cmd.trigger(OnPlayerDamage);
+        }
+    }
+}
+
+fn clear_player_grace(
+    mut e: Query<(Entity, &mut PlayerGrace)>,
+    mut cmd: Commands,
+    time: Res<Time>,
+) {
+    e.iter_mut().for_each(|(e, mut grace)| {
+        grace.timer.tick(time.delta());
+        if grace.timer.finished() {
+            cmd.entity(e).remove::<PlayerGrace>();
+        }
+    });
+}
+
+fn player_grace(
+    _event: Trigger<OnPlayerDamage>,
+    mut cmd: Commands,
+    player: Query<Entity, With<Player>>,
+) {
+    cmd.entity(player.single()).insert(PlayerGrace::default());
 }
 
 fn resolve_bullet_collisions(

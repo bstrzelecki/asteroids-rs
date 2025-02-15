@@ -7,7 +7,7 @@ use bevy_spatial::kdtree::KDTree2;
 use bevy_spatial::{AutomaticUpdate, SpatialAccess, SpatialStructure, TransformMode};
 use leafwing_input_manager::plugin::InputManagerPlugin;
 use particles::ParticlePlugin;
-use player::PlayerPlugin;
+use player::{OnPlayerDamage, PlayerPlugin};
 
 mod asteroid;
 mod particles;
@@ -28,9 +28,18 @@ fn main() {
         ))
         .add_plugins((PlayerPlugin, ParticlePlugin, AsteroidPlugin))
         .add_systems(Startup, setup)
-        .add_systems(Update, (apply_velocity, wrap_around, check_collisions))
+        .add_systems(
+            Update,
+            (
+                apply_velocity,
+                wrap_around,
+                check_collisions,
+                check_for_gameover,
+            ),
+        )
         .add_event::<CollisionEvent>()
         .add_observer(update_score)
+        .add_observer(update_lives)
         .run();
 }
 
@@ -143,11 +152,35 @@ fn setup(
         },
         ..default()
     })
-    .with_child(Text::new("X X X"));
+    .with_child((Text::new("X X X"), Lives::default()));
 }
 
 #[derive(Component)]
 struct WrapTimeout(u8);
+
+#[derive(Component)]
+struct Lives(i8);
+
+impl Default for Lives {
+    fn default() -> Self {
+        Self(3)
+    }
+}
+
+fn check_for_gameover(lives: Option<Single<&Lives, Changed<Lives>>>) {
+    if let Some(lives) = lives {
+        if lives.0 <= 0 {
+            println!("Player dead!");
+        }
+    }
+}
+
+fn update_lives(_event: Trigger<OnPlayerDamage>, mut text: Query<(&mut Text, &mut Lives)>) {
+    text.iter_mut().for_each(|(mut text, mut lives)| {
+        lives.0 -= 1;
+        text.0 = "X ".repeat(lives.0 as usize);
+    });
+}
 
 #[derive(Component, Default)]
 struct Score(u32);
