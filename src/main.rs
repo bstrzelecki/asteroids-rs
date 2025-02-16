@@ -249,3 +249,36 @@ fn apply_velocity(mut e: Query<(&mut Transform, &Velocity)>, time: Res<Time>) {
         it.0.translation.y += it.1.y * time.delta_secs() * 100.0;
     });
 }
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use bevy::prelude::*;
+
+    use crate::{Velocity, apply_velocity};
+
+    #[test]
+    fn velocity_applied() {
+        let mut world = World::default();
+
+        world.init_resource::<Time>();
+        let mut time = world.get_resource_mut::<Time>().unwrap();
+        time.advance_by(Duration::from_secs(1));
+
+        let system = world.register_system(apply_velocity);
+
+        let obj = world
+            .spawn((Transform::default(), Velocity { x: 1.0, y: 1.0 }))
+            .id();
+
+        assert_eq!(world.get::<Transform>(obj).unwrap().translation.x, 0.0);
+        assert_eq!(world.get::<Transform>(obj).unwrap().translation.y, 0.0);
+        let _ = world.run_system(system);
+        assert_eq!(world.get::<Transform>(obj).unwrap().translation.x, 100.0);
+        assert_eq!(world.get::<Transform>(obj).unwrap().translation.y, 100.0);
+        let _ = world.run_system(system);
+        assert_eq!(world.get::<Transform>(obj).unwrap().translation.x, 200.0);
+        assert_eq!(world.get::<Transform>(obj).unwrap().translation.y, 200.0);
+    }
+}
