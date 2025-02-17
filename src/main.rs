@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use asteroid::AsteroidPlugin;
 use bevy::{prelude::*, render::camera::ScalingMode};
+use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rand::plugin::EntropyPlugin;
 use bevy_spatial::kdtree::KDTree2;
 use bevy_spatial::{AutomaticUpdate, SpatialAccess, SpatialStructure, TransformMode};
@@ -25,6 +26,7 @@ fn main() {
                 .with_frequency(Duration::from_millis(16))
                 .with_spatial_ds(SpatialStructure::KDTree2)
                 .with_transform(TransformMode::GlobalTransform),
+            // WorldInspectorPlugin::default(),
         ))
         .add_plugins((PlayerPlugin, ParticlePlugin, AsteroidPlugin))
         .add_systems(Startup, setup)
@@ -78,13 +80,6 @@ type NNTree = KDTree2<SpatialMarker>;
 
 #[derive(Event)]
 struct CollisionEvent(Entity, Entity);
-
-fn update_score(event: Trigger<OnScoreUpdate>, mut text: Query<(&mut Text, &mut Score)>) {
-    text.iter_mut().for_each(|(mut text, mut score)| {
-        score.0 += event.0;
-        text.0 = format!("Score: {}", score.0);
-    });
-}
 
 fn check_collisions(
     e: Query<(Entity, &Transform, &CircleCollider)>,
@@ -187,6 +182,13 @@ struct Score(u32);
 
 #[derive(Event)]
 struct OnScoreUpdate(u32);
+
+fn update_score(event: Trigger<OnScoreUpdate>, mut text: Query<(&mut Text, &mut Score)>) {
+    text.iter_mut().for_each(|(mut text, mut score)| {
+        score.0 += event.0;
+        text.0 = format!("Score: {}", score.0);
+    });
+}
 
 fn wrap_around(
     mut e: Query<(Entity, &mut Transform, Option<&mut WrapTimeout>), With<Velocity>>,

@@ -129,7 +129,7 @@ pub fn player_input(
 }
 
 #[derive(Component)]
-struct ScoreMarker;
+pub struct ScoreMarker;
 
 pub fn shoot_projectile(
     player: Single<(
@@ -213,9 +213,15 @@ fn resolve_player_collisions(
     mut e: EventReader<CollisionEvent>,
     mut cmd: Commands,
     player: Query<Entity, (With<Player>, Without<PlayerGrace>)>,
+    bullets: Query<Entity, With<ScoreMarker>>,
 ) {
     for ev in e.read() {
-        if player.get(ev.0).is_ok() || player.get(ev.1).is_ok() {
+        if (player.get(ev.0).is_ok() && bullets.get(ev.1).is_err())
+            || (player.get(ev.1).is_ok() && bullets.get(ev.0).is_err())
+        {
+            if cmd.get_entity(ev.0).is_none() || cmd.get_entity(ev.1).is_none() {
+                continue;
+            }
             cmd.trigger(OnPlayerDamage);
         }
     }
@@ -250,27 +256,27 @@ fn resolve_bullet_collisions(
         &Transform,
         Option<&crate::asteroid::LargeAsteroid>,
     )>,
-    bullet: Query<&ScoreMarker>,
+    bullet: Query<(Entity, &ScoreMarker)>,
 ) {
     for ev in e.read() {
         if let Ok((_, _, is_large)) = asteroids.get(ev.0) {
             if bullet.get(ev.1).is_ok() {
-                dbg!("bullet hit asteroid");
                 if is_large.is_some() {
                     cmd.trigger(OnScoreUpdate(25));
                 } else {
                     cmd.trigger(OnScoreUpdate(10));
                 }
+                cmd.entity(bullet.get(ev.1).unwrap().0).despawn();
             }
         }
         if let Ok((_, _, is_large)) = asteroids.get(ev.1) {
             if bullet.get(ev.0).is_ok() {
-                dbg!("bullet hit asteroid");
                 if is_large.is_some() {
                     cmd.trigger(OnScoreUpdate(25));
                 } else {
                     cmd.trigger(OnScoreUpdate(10));
                 }
+                cmd.entity(bullet.get(ev.0).unwrap().0).despawn();
             }
         }
     }

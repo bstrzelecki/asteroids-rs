@@ -7,7 +7,7 @@ use rand::{Rng, distr::Distribution, rngs::ThreadRng};
 
 use crate::{
     CircleCollider, CollisionEvent, LARGE_ASTEROID_RADIUS, RngType, SMALL_ASTEROID_RADIUS,
-    Velocity, WINDOW_HEIGHT, WINDOW_WIDTH, WrapTimeout,
+    Velocity, WINDOW_HEIGHT, WINDOW_WIDTH, WrapTimeout, player::ScoreMarker,
 };
 
 pub struct AsteroidPlugin;
@@ -189,7 +189,7 @@ fn spawn_asteroid(
 fn resolve_asteroid_collisions(
     mut e: EventReader<CollisionEvent>,
     mut cmd: Commands,
-    asteroids: Query<(&WrapTimeout, &Transform, Option<&LargeAsteroid>)>,
+    asteroids: Query<(&WrapTimeout, &Transform, Option<&LargeAsteroid>), Without<ScoreMarker>>,
     effect: Res<crate::particles::CollisionEffect>,
 ) {
     for ev in e.read() {
