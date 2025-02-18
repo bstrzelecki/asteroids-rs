@@ -6,6 +6,7 @@ use bevy::{
 use bevy_egui::{EguiContexts, EguiPlugin, egui};
 use egui::Align2;
 use rust_i18n::t;
+use strum::IntoEnumIterator;
 
 use crate::{
     CleanupOnRestart, GameState, Language, Lives, OnScoreUpdate, Score, player::OnPlayerDamage,
@@ -108,9 +109,13 @@ fn main_menu(
             egui::ComboBox::from_label(t!("select.language"))
                 .selected_text(t!("current.language"))
                 .show_ui(ui, |ui| {
-                    ui.selectable_value(&mut *lang, Language::English, "English");
-                    ui.selectable_value(&mut *lang, Language::Polish, "Polski");
-                    ui.selectable_value(&mut *lang, Language::French, "Français");
+                    Language::iter().for_each(|language| {
+                        ui.selectable_value(
+                            &mut *lang,
+                            language,
+                            t!("current.language", locale = language.locale()),
+                        );
+                    });
                 });
             ui.checkbox(&mut inspector.0, t!("inspector"));
             if ui.button(t!("play")).clicked() {

@@ -8,6 +8,7 @@ use bevy_spatial::{AutomaticUpdate, SpatialAccess, SpatialStructure, TransformMo
 use leafwing_input_manager::plugin::InputManagerPlugin;
 use particles::ParticlePlugin;
 use player::PlayerPlugin;
+use strum::EnumIter;
 use ui::UiPlugin;
 
 mod asteroid;
@@ -77,7 +78,7 @@ enum GameState {
 
 rust_i18n::i18n!("locales", fallback = "en");
 
-#[derive(PartialEq, Default, Resource, Copy, Clone)]
+#[derive(PartialEq, Default, Resource, Copy, Clone, EnumIter)]
 enum Language {
     #[default]
     English,
