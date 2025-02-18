@@ -2,17 +2,18 @@ use std::time::Duration;
 
 use asteroid::AsteroidPlugin;
 use bevy::{prelude::*, render::camera::ScalingMode};
-use bevy_inspector_egui::quick::WorldInspectorPlugin;
 use bevy_rand::plugin::EntropyPlugin;
 use bevy_spatial::kdtree::KDTree2;
 use bevy_spatial::{AutomaticUpdate, SpatialAccess, SpatialStructure, TransformMode};
 use leafwing_input_manager::plugin::InputManagerPlugin;
 use particles::ParticlePlugin;
-use player::{OnPlayerDamage, PlayerPlugin};
+use player::PlayerPlugin;
+use ui::UiPlugin;
 
 mod asteroid;
 mod particles;
 mod player;
+mod ui;
 
 type RngType = bevy_prng::ChaCha8Rng;
 
@@ -26,22 +27,30 @@ fn main() {
                 .with_frequency(Duration::from_millis(16))
                 .with_spatial_ds(SpatialStructure::KDTree2)
                 .with_transform(TransformMode::GlobalTransform),
-            // WorldInspectorPlugin::default(),
         ))
-        .add_plugins((PlayerPlugin, ParticlePlugin, AsteroidPlugin))
+        .add_plugins((PlayerPlugin, ParticlePlugin, AsteroidPlugin, UiPlugin))
         .add_systems(Startup, setup)
         .add_systems(
             Update,
             (
-                apply_velocity,
-                wrap_around,
-                check_collisions,
-                check_for_gameover,
+                (
+                    apply_velocity,
+                    wrap_around,
+                    check_collisions,
+                    check_for_gameover,
+                )
+                    .run_if(in_state(GameState::Playing)),
+                (handle_restart).run_if(in_state(GameState::GameOver)),
             ),
         )
+        .add_systems(
+            OnEnter(GameState::GameOver),
+            (cleanup::<CleanupOnGameOver>,),
+        )
+        .add_systems(OnEnter(GameState::MainMenu), (cleanup::<CleanupOnRestart>,))
         .add_event::<CollisionEvent>()
-        .add_observer(update_score)
-        .add_observer(update_lives)
+        .init_state::<GameState>()
+        .init_resource::<Language>()
         .run();
 }
 
@@ -58,8 +67,51 @@ const WINDOW_HEIGHT: f32 = 1080.0;
 const SMALL_ASTEROID_RADIUS: f32 = 20.0;
 const LARGE_ASTEROID_RADIUS: f32 = 40.0;
 
-#[derive(Resource)]
-struct ProjectileSprite(Handle<ColorMaterial>, Handle<Mesh>);
+#[derive(States, Clone, Eq, PartialEq, Debug, Hash, Default)]
+enum GameState {
+    #[default]
+    MainMenu,
+    Playing,
+    GameOver,
+}
+
+rust_i18n::i18n!("locales", fallback = "en");
+
+#[derive(PartialEq, Default, Resource, Copy, Clone)]
+enum Language {
+    #[default]
+    English,
+    Polish,
+    French,
+}
+
+impl Language {
+    fn locale(&self) -> &'static str {
+        match self {
+            Language::English => "en",
+            Language::Polish => "pl",
+            Language::French => "fr",
+        }
+    }
+}
+
+fn handle_restart(key: Res<ButtonInput<KeyCode>>, mut state: ResMut<NextState<GameState>>) {
+    if key.just_pressed(KeyCode::KeyR) {
+        state.set(GameState::MainMenu);
+    }
+}
+
+#[derive(Component)]
+struct CleanupOnGameOver;
+
+#[derive(Component)]
+struct CleanupOnRestart;
+
+fn cleanup<T: Component>(mut cmd: Commands, e: Query<(Entity, &T)>) {
+    e.iter().for_each(|(e, _)| {
+        cmd.entity(e).despawn_recursive();
+    });
+}
 
 #[derive(Component, Default)]
 struct SpatialMarker;
@@ -100,15 +152,7 @@ fn check_collisions(
     });
 }
 
-fn setup(
-    mut cmd: Commands,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<ColorMaterial>>,
-) {
-    cmd.insert_resource(ProjectileSprite(
-        materials.add(Color::linear_rgb(0.0, 256.0, 0.0)),
-        meshes.add(Circle::new(20.0)),
-    ));
+fn setup(mut cmd: Commands) {
     cmd.spawn((
         Camera2d,
         Projection::from(OrthographicProjection {
@@ -120,34 +164,6 @@ fn setup(
         }),
         Transform::from_xyz(WINDOW_WIDTH / 2.0, WINDOW_HEIGHT / 2.0, 0.0),
     ));
-    cmd.spawn(Node {
-        width: Val::Percent(100.0),
-        height: Val::Percent(100.0),
-        align_items: AlignItems::Start,
-        justify_content: JustifyContent::Center,
-        padding: UiRect {
-            left: Val::Px(0.0),
-            right: Val::Px(0.0),
-            top: Val::Px(10.0),
-            bottom: Val::Px(0.0),
-        },
-        ..default()
-    })
-    .with_child((Text::new("Score: 0"), Score::default()));
-    cmd.spawn(Node {
-        width: Val::Percent(100.0),
-        height: Val::Percent(100.0),
-        align_items: AlignItems::Start,
-        justify_content: JustifyContent::Start,
-        padding: UiRect {
-            left: Val::Px(10.0),
-            right: Val::Px(0.0),
-            top: Val::Px(10.0),
-            bottom: Val::Px(0.0),
-        },
-        ..default()
-    })
-    .with_child((Text::new("X X X"), Lives::default()));
 }
 
 #[derive(Component)]
@@ -162,19 +178,15 @@ impl Default for Lives {
     }
 }
 
-fn check_for_gameover(lives: Option<Single<&Lives, Changed<Lives>>>) {
+fn check_for_gameover(
+    mut state: ResMut<NextState<GameState>>,
+    lives: Option<Single<&Lives, Changed<Lives>>>,
+) {
     if let Some(lives) = lives {
         if lives.0 <= 0 {
-            println!("Player dead!");
+            state.set(GameState::GameOver);
         }
     }
-}
-
-fn update_lives(_event: Trigger<OnPlayerDamage>, mut text: Query<(&mut Text, &mut Lives)>) {
-    text.iter_mut().for_each(|(mut text, mut lives)| {
-        lives.0 -= 1;
-        text.0 = "X ".repeat(lives.0 as usize);
-    });
 }
 
 #[derive(Component, Default)]
@@ -182,13 +194,6 @@ struct Score(u32);
 
 #[derive(Event)]
 struct OnScoreUpdate(u32);
-
-fn update_score(event: Trigger<OnScoreUpdate>, mut text: Query<(&mut Text, &mut Score)>) {
-    text.iter_mut().for_each(|(mut text, mut score)| {
-        score.0 += event.0;
-        text.0 = format!("Score: {}", score.0);
-    });
-}
 
 fn wrap_around(
     mut e: Query<(Entity, &mut Transform, Option<&mut WrapTimeout>), With<Velocity>>,

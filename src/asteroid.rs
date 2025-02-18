@@ -6,8 +6,8 @@ use bevy_rand::{global::GlobalEntropy, prelude::Entropy, traits::ForkableRng};
 use rand::{Rng, distr::Distribution, rngs::ThreadRng};
 
 use crate::{
-    CircleCollider, CollisionEvent, LARGE_ASTEROID_RADIUS, RngType, SMALL_ASTEROID_RADIUS,
-    Velocity, WINDOW_HEIGHT, WINDOW_WIDTH, WrapTimeout, player::ScoreMarker,
+    CircleCollider, CleanupOnGameOver, CollisionEvent, GameState, LARGE_ASTEROID_RADIUS, RngType,
+    SMALL_ASTEROID_RADIUS, Velocity, WINDOW_HEIGHT, WINDOW_WIDTH, WrapTimeout, player::ScoreMarker,
 };
 
 pub struct AsteroidPlugin;
@@ -17,7 +17,8 @@ impl Plugin for AsteroidPlugin {
         app.add_systems(Startup, setup)
             .add_systems(
                 Update,
-                (spawn_asteroid, handle_grace, resolve_asteroid_collisions),
+                (spawn_asteroid, handle_grace, resolve_asteroid_collisions)
+                    .run_if(in_state(GameState::Playing)),
             )
             .add_observer(divide_on_collision);
     }
@@ -85,6 +86,7 @@ impl AsteroidSpawner {
             } else {
                 Default::default()
             },
+            CleanupOnGameOver,
         )
     }
 

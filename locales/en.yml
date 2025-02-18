@@ -1,0 +1,7 @@
+_version: 1
+select.language: "Language select"
+play: "Play"
+current.language: "English"
+gameover: "GameOver"
+points: "Score: %{count}"
+goto_main_menu: "press 'r', to return to main menu"

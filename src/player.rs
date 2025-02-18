@@ -6,9 +6,9 @@ use leafwing_input_manager::{
 use strum::{EnumIter, IntoEnumIterator};
 
 use crate::{
-    ACC_SPEED, CircleCollider, CollisionEvent, MAX_VELOCITY, OnScoreUpdate, PROJECTILE_SPEED,
-    ProjectileSprite, ROTATION_SPEED, SHOOT_TIMEOUT, Velocity, WINDOW_HEIGHT, WINDOW_WIDTH,
-    WrapTimeout,
+    ACC_SPEED, CircleCollider, CleanupOnGameOver, CollisionEvent, GameState, MAX_VELOCITY,
+    OnScoreUpdate, PROJECTILE_SPEED, ROTATION_SPEED, SHOOT_TIMEOUT, Velocity, WINDOW_HEIGHT,
+    WINDOW_WIDTH, WrapTimeout,
 };
 
 pub struct PlayerPlugin;
@@ -35,7 +35,7 @@ pub enum PlayerAction {
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(Startup, setup)
+        app.add_systems(OnEnter(GameState::Playing), setup)
             .add_systems(
                 Update,
                 (
@@ -45,16 +45,25 @@ impl Plugin for PlayerPlugin {
                     resolve_bullet_collisions,
                     resolve_player_collisions,
                     clear_player_grace,
-                ),
+                )
+                    .run_if(in_state(GameState::Playing)),
             )
             .add_observer(player_grace);
     }
 }
+
+#[derive(Resource)]
+struct ProjectileSprite(Handle<ColorMaterial>, Handle<Mesh>);
+
 fn setup(
     mut cmd: Commands,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
+    cmd.insert_resource(ProjectileSprite(
+        materials.add(Color::linear_rgb(0.0, 256.0, 0.0)),
+        meshes.add(Circle::new(20.0)),
+    ));
     let player_mesh = Mesh2d(meshes.add(Triangle2d::new(
         Vec2::new(0.0, 50.0),
         Vec2::new(-50.0, -50.0),
@@ -68,12 +77,14 @@ fn setup(
         Player::default(),
         InputManagerBundle::<PlayerAction>::with_map(Player::default_input_map()),
         CircleCollider::new(15.0),
+        CleanupOnGameOver,
     ));
     for shadow in PlayerShadow::iter() {
         cmd.spawn((
             player_mesh.clone(),
             MeshMaterial2d(materials.add(Color::linear_rgb(256.0, 0.0, 0.0))),
             Transform::from_xyz(0.0, 0.0, 0.0),
+            CleanupOnGameOver,
             shadow,
         ));
     }
@@ -131,7 +142,7 @@ pub fn player_input(
 #[derive(Component)]
 pub struct ScoreMarker;
 
-pub fn shoot_projectile(
+fn shoot_projectile(
     player: Single<(
         &Transform,
         &Velocity,
@@ -161,6 +172,7 @@ pub fn shoot_projectile(
                 WrapTimeout(1),
                 CircleCollider::new(10.0),
                 ScoreMarker,
+                CleanupOnGameOver,
             ));
             timer.projectile_spawn_delay.reset();
         }

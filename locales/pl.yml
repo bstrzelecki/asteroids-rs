@@ -1,0 +1,7 @@
+_version: 1
+select.language: "Wybierz język"
+play: "Graj"
+current.language: "Polski"
+gameover: "Koniec gry"
+points: "Punkty: %{count}"
+goto_main_menu: "wcisnij 'r', aby przejsc do glownego menu"
