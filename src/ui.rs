@@ -20,12 +20,19 @@ impl Plugin for UiPlugin {
             .add_systems(OnEnter(GameState::Playing), setup_hud)
             .add_observer(update_score)
             .add_observer(update_lives)
+            .init_resource::<EnableInspector>()
             .add_plugins((
                 EguiPlugin,
-                //bevy_inspector_egui::quick::WorldInspectorPlugin::default(),
+                bevy_inspector_egui::quick::WorldInspectorPlugin::default().run_if(
+                    resource_exists_and_equals::<EnableInspector>(EnableInspector(true)),
+                ),
             ));
     }
 }
+
+#[derive(Default, Resource, PartialEq)]
+struct EnableInspector(bool);
+
 fn setup_hud(mut cmd: Commands) {
     cmd.spawn((
         Node {
@@ -91,6 +98,7 @@ fn main_menu(
     mut state: ResMut<NextState<GameState>>,
     mut ctx: EguiContexts,
     mut lang: ResMut<Language>,
+    mut inspector: ResMut<EnableInspector>,
 ) {
     let rect = ctx.ctx_mut().input(|i: &egui::InputState| i.screen_rect());
     egui::Window::new("Asteroids")
@@ -104,6 +112,7 @@ fn main_menu(
                     ui.selectable_value(&mut *lang, Language::Polish, "Polski");
                     ui.selectable_value(&mut *lang, Language::French, "Francais");
                 });
+            ui.checkbox(&mut inspector.0, "inspector");
             if ui.button(t!("play")).clicked() {
                 state.set(GameState::Playing);
             }
