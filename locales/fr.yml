@@ -1,0 +1,8 @@
+_version: 1
+select.language: "Sélection de la langue"
+play: "Jouer"
+current.language: "Français"
+gameover: "Fin du jeu"
+points: "Score: %{count}"
+goto_main_menu: "Appuyez sur 'r' pour revenir au menu principal"
+inspector: "Inspecteur"

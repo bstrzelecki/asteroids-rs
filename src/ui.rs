@@ -110,9 +110,9 @@ fn main_menu(
                 .show_ui(ui, |ui| {
                     ui.selectable_value(&mut *lang, Language::English, "English");
                     ui.selectable_value(&mut *lang, Language::Polish, "Polski");
-                    ui.selectable_value(&mut *lang, Language::French, "Francais");
+                    ui.selectable_value(&mut *lang, Language::French, "Français");
                 });
-            ui.checkbox(&mut inspector.0, "inspector");
+            ui.checkbox(&mut inspector.0, t!("inspector"));
             if ui.button(t!("play")).clicked() {
                 state.set(GameState::Playing);
             }
