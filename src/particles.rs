@@ -2,8 +2,8 @@ use bevy::app::{App, Plugin, Startup};
 use bevy::prelude::*;
 use bevy_hanabi::{
     Attribute, ColorOverLifetimeModifier, EffectAsset, ExprWriter, Gradient, HanabiPlugin,
-    ScalarType, SetAttributeModifier, SetPositionSphereModifier, SetVelocitySphereModifier,
-    ShapeDimension, Spawner,
+    ParticleEffect, ParticleEffectBundle, ScalarType, SetAttributeModifier,
+    SetPositionSphereModifier, SetVelocitySphereModifier, ShapeDimension, Spawner,
 };
 
 pub struct ParticlePlugin;
@@ -42,7 +42,11 @@ fn cleanup_after_timeout(
     });
 }
 
-fn setup(mut effect: ResMut<CollisionEffect>, mut effects: ResMut<Assets<EffectAsset>>) {
+fn setup(
+    mut effect: ResMut<CollisionEffect>,
+    mut effects: ResMut<Assets<EffectAsset>>,
+    mut cmd: Commands,
+) {
     let writer = ExprWriter::new();
 
     let init_pos = SetPositionSphereModifier {
@@ -76,4 +80,13 @@ fn setup(mut effect: ResMut<CollisionEffect>, mut effects: ResMut<Assets<EffectA
             .render(ColorOverLifetimeModifier { gradient }),
     );
     effect.0 = effect_handle;
+    cmd.spawn((
+        // First effect doesn't load (#319)
+        ParticleEffectBundle {
+            effect: ParticleEffect::new(effect.0.clone()),
+            transform: Transform::from_xyz(-100.0, -100.0, 0.0),
+            ..default()
+        },
+        CleanupAfterTimeout::default(),
+    ));
 }
