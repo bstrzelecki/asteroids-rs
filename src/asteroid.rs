@@ -7,7 +7,8 @@ use rand::{Rng, distr::Distribution, rngs::ThreadRng};
 
 use crate::{
     CircleCollider, CleanupOnGameOver, CollisionEvent, GameState, LARGE_ASTEROID_RADIUS, RngType,
-    SMALL_ASTEROID_RADIUS, Velocity, WINDOW_HEIGHT, WINDOW_WIDTH, WrapTimeout, player::ScoreMarker,
+    SMALL_ASTEROID_RADIUS, Velocity, WINDOW_HEIGHT, WINDOW_WIDTH, WrapTimeout,
+    particles::CleanupAfterTimeout, player::ScoreMarker,
 };
 
 pub struct AsteroidPlugin;
@@ -197,11 +198,14 @@ fn resolve_asteroid_collisions(
     for ev in e.read() {
         if let Ok((_, transform, is_large)) = asteroids.get(ev.0) {
             cmd.entity(ev.0).try_despawn();
-            cmd.spawn(ParticleEffectBundle {
-                effect: ParticleEffect::new(effect.0.clone()),
-                transform: *transform,
-                ..default()
-            });
+            cmd.spawn((
+                ParticleEffectBundle {
+                    effect: ParticleEffect::new(effect.0.clone()),
+                    transform: *transform,
+                    ..default()
+                },
+                CleanupAfterTimeout::default(),
+            ));
             if is_large.is_some() {
                 cmd.trigger(Divide(*transform));
             }

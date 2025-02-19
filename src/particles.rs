@@ -11,12 +11,36 @@ pub struct ParticlePlugin;
 impl Plugin for ParticlePlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, setup)
+            .add_systems(Update, cleanup_after_timeout)
             .init_resource::<CollisionEffect>()
             .add_plugins(HanabiPlugin);
     }
 }
 #[derive(Resource, Default)]
 pub struct CollisionEffect(pub Handle<EffectAsset>);
+
+#[derive(Component)]
+pub struct CleanupAfterTimeout(Timer);
+
+impl Default for CleanupAfterTimeout {
+    fn default() -> Self {
+        Self(Timer::from_seconds(3.0, TimerMode::Once))
+    }
+}
+
+fn cleanup_after_timeout(
+    mut cmd: Commands,
+    time: Res<Time>,
+    mut timer: Query<(&mut CleanupAfterTimeout, Entity)>,
+) {
+    timer.iter_mut().for_each(|(mut timer, e)| {
+        timer.0.tick(time.delta());
+        if timer.0.finished() {
+            cmd.entity(e).despawn();
+            timer.0.reset();
+        }
+    });
+}
 
 fn setup(mut effect: ResMut<CollisionEffect>, mut effects: ResMut<Assets<EffectAsset>>) {
     let writer = ExprWriter::new();
