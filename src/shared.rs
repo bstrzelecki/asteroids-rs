@@ -3,7 +3,7 @@ use std::time::Duration;
 use bevy::prelude::*;
 use lightyear::prelude::*;
 
-struct SharedPlugin;
+pub struct SharedPlugin;
 
 pub const SERVER_REPLICATION_INTERVAL: Duration = Duration::from_millis(100);
 pub const FIXED_TIMESTEP_HZ: f64 = 64.0;

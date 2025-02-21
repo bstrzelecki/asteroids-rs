@@ -5,7 +5,6 @@ use bevy::{
 };
 use bevy_egui::{EguiContexts, EguiPlugin, egui};
 use egui::Align2;
-use lightyear::{client::config::ClientConfig, prelude::client::NetConfig};
 use rust_i18n::t;
 use strum::IntoEnumIterator;
 

@@ -2,7 +2,7 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
-use bevy_egui::{EguiContext, EguiContexts, egui};
+use bevy_egui::{EguiContext, egui};
 use egui::Align2;
 use lightyear::prelude::*;
 use lightyear::server::events::{ConnectEvent, DisconnectEvent};
