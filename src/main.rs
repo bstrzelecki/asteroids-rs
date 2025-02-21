@@ -1,3 +1,4 @@
+use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use std::time::Duration;
 
 use asteroid::AsteroidPlugin;
@@ -12,15 +13,34 @@ use strum::EnumIter;
 use ui::UiPlugin;
 
 mod asteroid;
+mod client;
 mod particles;
 mod player;
+mod server;
+mod shared;
 mod ui;
 
 type RngType = bevy_prng::ChaCha8Rng;
+const SERVER_ADDR: SocketAddr = SocketAddr::new(IpAddr::V4(Ipv4Addr::LOCALHOST), 5000);
+
+#[derive(Resource)]
+struct ServerAddress {
+    ip: String,
+    port: u16,
+}
+
+impl Default for ServerAddress {
+    fn default() -> Self {
+        Self {
+            ip: Ipv4Addr::LOCALHOST.to_string(),
+            port: 5000,
+        }
+    }
+}
 
 fn main() {
-    App::new()
-        .add_plugins(DefaultPlugins)
+    let mut app = App::new();
+    app.add_plugins(DefaultPlugins)
         .add_plugins((
             InputManagerPlugin::<player::PlayerAction>::default(),
             EntropyPlugin::<RngType>::default(),
@@ -51,9 +71,23 @@ fn main() {
         .add_systems(OnEnter(GameState::MainMenu), (cleanup::<CleanupOnRestart>,))
         .add_event::<CollisionEvent>()
         .init_state::<GameState>()
-        .init_resource::<Language>()
-        .run();
+        .init_resource::<ServerAddress>()
+        .init_resource::<Language>();
+
+    #[cfg(feature = "client")]
+    app.add_plugins((client::ClientPlugin,));
+
+    #[cfg(feature = "server")]
+    app.add_plugins((server::ServerPlugin,));
+
+    app.run();
 }
+
+#[derive(Event)]
+struct HostGame;
+
+#[derive(Event)]
+struct JoinGame;
 
 const ACC_SPEED: f32 = 5.0;
 const ROTATION_SPEED: f32 = 8.0;
@@ -72,6 +106,7 @@ const LARGE_ASTEROID_RADIUS: f32 = 40.0;
 enum GameState {
     #[default]
     MainMenu,
+    Lobby,
     Playing,
     GameOver,
 }

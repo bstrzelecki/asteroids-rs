@@ -9,6 +9,11 @@ opt-level = 1
 [profile.dev.package."*"]
 opt-level = 3
 
+[features]
+default = ["client", "server"]
+client = []
+server = []
+
 [dependencies]
 bevy = { version="0.15", features=["wayland", "dynamic_linking"] }
 leafwing-input-manager = { version = "0.16.0" }
@@ -22,3 +27,4 @@ egui = "0.31"
 bevy_egui = "0.32"
 bevy-inspector-egui = "0.29"
 rust-i18n = "3.1"
+lightyear = "0.19"

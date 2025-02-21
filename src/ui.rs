@@ -5,11 +5,13 @@ use bevy::{
 };
 use bevy_egui::{EguiContexts, EguiPlugin, egui};
 use egui::Align2;
+use lightyear::{client::config::ClientConfig, prelude::client::NetConfig};
 use rust_i18n::t;
 use strum::IntoEnumIterator;
 
 use crate::{
-    CleanupOnRestart, GameState, Language, Lives, OnScoreUpdate, Score, player::OnPlayerDamage,
+    CleanupOnRestart, GameState, HostGame, JoinGame, Language, Lives, OnScoreUpdate, Score,
+    ServerAddress, player::OnPlayerDamage,
 };
 
 pub struct UiPlugin;
@@ -96,10 +98,11 @@ fn handle_gameover(mut cmd: Commands) {
 }
 
 fn main_menu(
-    mut state: ResMut<NextState<GameState>>,
+    mut cmd: Commands,
     mut ctx: EguiContexts,
     mut lang: ResMut<Language>,
     mut inspector: ResMut<EnableInspector>,
+    mut address: ResMut<ServerAddress>,
 ) {
     let rect = ctx.ctx_mut().input(|i: &egui::InputState| i.screen_rect());
     egui::Window::new("Asteroids")
@@ -118,9 +121,26 @@ fn main_menu(
                     });
                 });
             ui.checkbox(&mut inspector.0, t!("inspector"));
-            if ui.button(t!("play")).clicked() {
-                state.set(GameState::Playing);
-            }
+            ui.horizontal(|ui| {
+                let mut text = address.ip.clone();
+                let mut port = address.port.clone().to_string();
+                if ui.text_edit_singleline(&mut text).changed() {
+                    address.ip = text;
+                }
+                if ui.text_edit_singleline(&mut port).changed() {
+                    if let Ok(valid) = port.parse::<u16>() {
+                        address.port = valid;
+                    }
+                }
+            });
+            ui.horizontal(|ui| {
+                if ui.button(t!("play.host")).clicked() {
+                    cmd.trigger(HostGame);
+                }
+                if ui.button(t!("play.join")).clicked() {
+                    cmd.trigger(JoinGame);
+                }
+            });
         });
     rust_i18n::set_locale(lang.locale());
 }
