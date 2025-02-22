@@ -5,7 +5,7 @@ use lightyear::prelude::*;
 
 use serde::{Deserialize, Serialize};
 
-use crate::{Velocity, asteroid::LargeAsteroid};
+use crate::{Velocity, asteroid::LargeAsteroid, player::PlayerId};
 
 pub struct SharedPlugin;
 
@@ -44,5 +44,6 @@ impl Plugin for SharedPlugin {
         app.register_component::<Transform>(ChannelDirection::ServerToClient);
         app.register_component::<Velocity>(ChannelDirection::ServerToClient);
         app.register_component::<LargeAsteroid>(ChannelDirection::ServerToClient);
+        app.register_component::<PlayerId>(ChannelDirection::ServerToClient);
     }
 }

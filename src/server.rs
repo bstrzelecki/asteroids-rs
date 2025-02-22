@@ -3,8 +3,8 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use bevy_egui::{EguiContext, egui};
-use client::ClientCommands;
 use egui::Align2;
+use lightyear::prelude::server::Replicate;
 use lightyear::prelude::*;
 use lightyear::server::events::{ConnectEvent, DisconnectEvent};
 use rust_i18n::t;
@@ -13,11 +13,13 @@ use server::{
     ServerTransport,
 };
 
+use crate::player::{PlayerId, PlayerSpawner};
 use crate::shared::{DefaultChannel, StartGameMessage};
 use crate::{
     GameState, HostGame, SERVER_ADDR, ServerAddress,
     shared::{self, SERVER_REPLICATION_INTERVAL},
 };
+use crate::{Velocity, WINDOW_HEIGHT, WINDOW_WIDTH};
 
 pub struct ServerPlugin;
 
@@ -48,6 +50,10 @@ impl Plugin for ServerPlugin {
             .add_observer(on_start_game)
             .init_resource::<ConnectedPlayers>()
             .add_systems(
+                OnEnter(GameState::Playing),
+                spawn_player_for_each_connection,
+            )
+            .add_systems(
                 Update,
                 (
                     (
@@ -66,6 +72,22 @@ impl Plugin for ServerPlugin {
 #[derive(Resource, Default)]
 struct ConnectedPlayers {
     players: Vec<u64>,
+}
+
+fn spawn_player_for_each_connection(
+    mut cmd: Commands,
+    players: Res<ConnectedPlayers>,
+    spawner: Single<&PlayerSpawner>,
+) {
+    for player in &players.players {
+        cmd.spawn((
+            spawner.player_client(),
+            PlayerId(*player),
+            Transform::from_xyz(WINDOW_WIDTH / 2.0, WINDOW_HEIGHT / 2.0, 0.0),
+            Velocity { x: 0.0, y: 0.0 },
+            Replicate::default(),
+        ));
+    }
 }
 
 fn handle_connections(

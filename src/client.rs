@@ -11,6 +11,7 @@ use lightyear::{
 use rust_i18n::t;
 
 use crate::asteroid::{AsteroidSpawner, LargeAsteroid};
+use crate::player::{PlayerId, PlayerSpawner};
 use crate::{
     CircleCollider, CleanupOnGameOver, CleanupOnGameStart, GameState, JoinGame,
     LARGE_ASTEROID_RADIUS, SERVER_ADDR, SMALL_ASTEROID_RADIUS, ServerAddress, Velocity,
@@ -56,6 +57,7 @@ impl Plugin for ClientPlugin {
                     update_client_config.run_if(in_state(GameState::MainMenu)),
                     wait_for_start.run_if(in_state(GameState::Lobby)),
                     on_asteroid_spawn,
+                    on_player_spawn.run_if(in_state(GameState::Playing)),
                 ),
             );
     }
@@ -92,20 +94,36 @@ fn on_join_lobby(mut cmd: Commands) {
 
 fn on_asteroid_spawn(
     mut events: EventReader<EntitySpawnEvent>,
-    asteroids: Query<(&Transform, &Velocity, Option<&LargeAsteroid>)>,
+    asteroids: Query<(&Transform, &Velocity, Option<&LargeAsteroid>), Without<PlayerId>>,
     mut cmd: Commands,
     spawner: Single<&AsteroidSpawner>,
 ) {
     for event in events.read() {
-        let is_large = asteroids.get(event.entity()).is_ok_and(|it| it.2.is_some());
-        cmd.entity(event.entity()).insert((
-            spawner.asteroid_client(is_large),
-            CircleCollider::new(if is_large {
-                LARGE_ASTEROID_RADIUS
-            } else {
-                SMALL_ASTEROID_RADIUS
-            }),
-        ));
+        if let Ok(entity) = asteroids.get(event.entity()) {
+            let is_large = entity.2.is_some();
+            cmd.entity(event.entity()).insert((
+                spawner.asteroid_client(is_large),
+                CircleCollider::new(if is_large {
+                    LARGE_ASTEROID_RADIUS
+                } else {
+                    SMALL_ASTEROID_RADIUS
+                }),
+            ));
+        }
+    }
+}
+
+fn on_player_spawn(
+    mut events: EventReader<EntitySpawnEvent>,
+    asteroids: Query<(&Transform, &Velocity), With<PlayerId>>,
+    mut cmd: Commands,
+    spawner: Single<&PlayerSpawner>,
+) {
+    for event in events.read() {
+        if let Ok(_entity) = asteroids.get(event.entity()) {
+            cmd.entity(event.entity())
+                .insert((spawner.player_client(),));
+        }
     }
 }
 

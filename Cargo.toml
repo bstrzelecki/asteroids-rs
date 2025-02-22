@@ -26,5 +26,5 @@ bevy_hanabi = "0.14"
 bevy_egui = "0.33"
 bevy-inspector-egui = "0.29"
 rust-i18n = "3.1"
-lightyear = "0.19"
+lightyear = {version = "0.19", features = ["leafwing"]}
 serde = "1.0"

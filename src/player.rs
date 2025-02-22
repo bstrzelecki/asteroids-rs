@@ -3,6 +3,9 @@ use leafwing_input_manager::{
     Actionlike, InputManagerBundle,
     prelude::{ActionState, InputMap},
 };
+use lightyear::prelude::server::Replicate;
+use lightyear::server;
+use serde::{Deserialize, Serialize};
 use strum::{EnumIter, IntoEnumIterator};
 
 use crate::{
@@ -26,7 +29,7 @@ pub enum PlayerShadow {
     Bottom,
 }
 
-#[derive(Actionlike, Debug, Clone, Eq, PartialEq, Hash, Reflect)]
+#[derive(Actionlike, Debug, Clone, Eq, PartialEq, Hash, Reflect, Serialize, Deserialize)]
 pub enum PlayerAction {
     Forward,
     Shoot,
@@ -35,7 +38,8 @@ pub enum PlayerAction {
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(GameState::Playing), setup)
+        app.add_systems(Startup, setup)
+            .add_systems(OnEnter(GameState::Playing), game_setup)
             .add_systems(
                 Update,
                 (
@@ -55,8 +59,31 @@ impl Plugin for PlayerPlugin {
 #[derive(Resource)]
 struct ProjectileSprite(Handle<ColorMaterial>, Handle<Mesh>);
 
+#[derive(Component, PartialEq, Serialize, Deserialize)]
+pub struct PlayerId(pub u64);
+
+#[derive(Component)]
+pub struct PlayerSpawner {
+    mesh: Handle<Mesh>,
+    material: Handle<ColorMaterial>,
+}
+
+impl PlayerSpawner {
+    fn new(mesh: Handle<Mesh>, material: Handle<ColorMaterial>) -> Self {
+        Self { mesh, material }
+    }
+
+    pub fn player_client(&self) -> impl Bundle {
+        (
+            Mesh2d(self.mesh.clone()),
+            MeshMaterial2d(self.material.clone()),
+        )
+    }
+}
+
 fn setup(
     mut cmd: Commands,
+
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
@@ -64,25 +91,30 @@ fn setup(
         materials.add(Color::linear_rgb(0.0, 256.0, 0.0)),
         meshes.add(Circle::new(20.0)),
     ));
-    let player_mesh = Mesh2d(meshes.add(Triangle2d::new(
+    let player_mesh = meshes.add(Triangle2d::new(
         Vec2::new(0.0, 50.0),
         Vec2::new(-50.0, -50.0),
         Vec2::new(50.0, -50.0),
-    )));
+    ));
+    let mat = materials.add(Color::linear_rgb(256.0, 0.0, 0.0));
+    cmd.spawn(PlayerSpawner::new(player_mesh.clone(), mat.clone()));
+}
+
+fn game_setup(mut cmd: Commands, spawner: Single<&PlayerSpawner>) {
     cmd.spawn((
-        player_mesh.clone(),
-        MeshMaterial2d(materials.add(Color::linear_rgb(256.0, 0.0, 0.0))),
+        spawner.player_client(),
         Transform::from_xyz(WINDOW_WIDTH / 2.0, WINDOW_HEIGHT / 2.0, 0.0),
         Velocity { x: 0.0, y: 0.0 },
         Player::default(),
         InputManagerBundle::<PlayerAction>::with_map(Player::default_input_map()),
         CircleCollider::new(15.0),
         CleanupOnGameOver,
+        PlayerId(0),
+        Replicate::default(),
     ));
     for shadow in PlayerShadow::iter() {
         cmd.spawn((
-            player_mesh.clone(),
-            MeshMaterial2d(materials.add(Color::linear_rgb(256.0, 0.0, 0.0))),
+            spawner.player_client(),
             Transform::from_xyz(0.0, 0.0, 0.0),
             CleanupOnGameOver,
             shadow,
