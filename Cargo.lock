@@ -322,6 +322,7 @@ dependencies = [
  "lightyear",
  "rand 0.9.0",
  "rust-i18n",
+ "serde",
  "strum",
 ]
 

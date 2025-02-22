@@ -3,7 +3,10 @@ use std::time::Duration;
 use bevy::prelude::*;
 use bevy_hanabi::{ParticleEffect, ParticleEffectBundle};
 use bevy_rand::{global::GlobalEntropy, prelude::Entropy, traits::ForkableRng};
+use lightyear::prelude::is_server;
+use lightyear::prelude::server::Replicate;
 use rand::{Rng, distr::Distribution, rngs::ThreadRng};
+use serde::{Deserialize, Serialize};
 
 use crate::{
     CircleCollider, CleanupOnGameOver, CollisionEvent, GameState, LARGE_ASTEROID_RADIUS, RngType,
@@ -18,7 +21,11 @@ impl Plugin for AsteroidPlugin {
         app.add_systems(Startup, setup)
             .add_systems(
                 Update,
-                (spawn_asteroid, handle_grace, resolve_asteroid_collisions)
+                (
+                    spawn_asteroid.run_if(is_server),
+                    handle_grace,
+                    resolve_asteroid_collisions,
+                )
                     .run_if(in_state(GameState::Playing)),
             )
             .add_observer(divide_on_collision);
@@ -26,7 +33,7 @@ impl Plugin for AsteroidPlugin {
 }
 
 #[derive(Component)]
-struct AsteroidSpawner {
+pub struct AsteroidSpawner {
     timer: Timer,
     material: Handle<ColorMaterial>,
     small_mesh: Handle<Mesh>,
@@ -48,7 +55,7 @@ fn setup(
     ));
 }
 
-#[derive(Component)]
+#[derive(Component, PartialEq, Serialize, Deserialize, Debug, Clone)]
 pub struct LargeAsteroid;
 
 impl AsteroidSpawner {
@@ -75,12 +82,7 @@ impl AsteroidSpawner {
         (
             Transform::from_translation(pos.translation),
             velocity,
-            Mesh2d(if is_large {
-                self.large_mesh.clone()
-            } else {
-                self.small_mesh.clone()
-            }),
-            MeshMaterial2d(self.material.clone()),
+            self.asteroid_client(is_large),
             WrapTimeout(5),
             if grace {
                 PostSpawnGrace::default()
@@ -88,6 +90,18 @@ impl AsteroidSpawner {
                 Default::default()
             },
             CleanupOnGameOver,
+            Replicate::default(),
+        )
+    }
+
+    pub fn asteroid_client(&self, is_large: bool) -> impl Bundle {
+        (
+            Mesh2d(if is_large {
+                self.large_mesh.clone()
+            } else {
+                self.small_mesh.clone()
+            }),
+            MeshMaterial2d(self.material.clone()),
         )
     }
 

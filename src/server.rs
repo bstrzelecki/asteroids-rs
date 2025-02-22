@@ -3,14 +3,17 @@ use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
 use bevy_egui::{EguiContext, egui};
+use client::ClientCommands;
 use egui::Align2;
 use lightyear::prelude::*;
 use lightyear::server::events::{ConnectEvent, DisconnectEvent};
+use rust_i18n::t;
 use server::{
     IoConfig, NetConfig, NetcodeConfig, ServerCommands, ServerConfig, ServerPlugins,
     ServerTransport,
 };
 
+use crate::shared::{DefaultChannel, StartGameMessage};
 use crate::{
     GameState, HostGame, SERVER_ADDR, ServerAddress,
     shared::{self, SERVER_REPLICATION_INTERVAL},
@@ -42,6 +45,7 @@ impl Plugin for ServerPlugin {
         };
         app.add_plugins(ServerPlugins::new(config))
             .add_observer(on_host_game)
+            .add_observer(on_start_game)
             .init_resource::<ConnectedPlayers>()
             .add_systems(
                 Update,
@@ -52,7 +56,7 @@ impl Plugin for ServerPlugin {
                         handle_disconnections,
                         lobby_menu,
                     )
-                        .run_if(in_state(GameState::Lobby)),
+                        .run_if(in_state(GameState::Lobby).and(is_server)),
                     update_server_config.run_if(in_state(GameState::MainMenu)),
                 ),
             );
@@ -84,6 +88,9 @@ fn handle_disconnections(
     }
 }
 
+#[derive(Event)]
+struct StartGame;
+
 fn lobby_menu(
     mut cmd: Commands,
     mut ctx: Query<&mut EguiContext, With<PrimaryWindow>>,
@@ -92,6 +99,8 @@ fn lobby_menu(
     let Ok(mut ctx) = ctx.get_single_mut() else {
         return;
     };
+    ctx.get_mut()
+        .options_mut(|opt| opt.warn_on_id_clash = false); // Likely irrelevant warning
     let rect = ctx.get_mut().input(|i: &egui::InputState| i.screen_rect());
     egui::Window::new("Lobby")
         .pivot(Align2::CENTER_CENTER)
@@ -100,7 +109,26 @@ fn lobby_menu(
             for client in &players.players {
                 ui.label(format!("Player {}", client));
             }
+            if ui.button(t!("play")).clicked() {
+                cmd.trigger(StartGame);
+            }
         });
+}
+
+fn on_start_game(
+    _trigger: Trigger<StartGame>,
+    mut server: ResMut<server::ConnectionManager>,
+    mut state: ResMut<NextState<GameState>>,
+) {
+    server
+        .send_message_to_target::<DefaultChannel, StartGameMessage>(
+            &StartGameMessage,
+            NetworkTarget::All,
+        )
+        .unwrap_or_else(|e| {
+            error!("Failed to send start game message: {}", e);
+        });
+    state.set(GameState::Playing);
 }
 
 fn on_host_game(

@@ -9,6 +9,7 @@ use bevy_spatial::{AutomaticUpdate, SpatialAccess, SpatialStructure, TransformMo
 use leafwing_input_manager::plugin::InputManagerPlugin;
 use particles::ParticlePlugin;
 use player::PlayerPlugin;
+use serde::Serialize;
 use strum::EnumIter;
 use ui::UiPlugin;
 
@@ -68,6 +69,7 @@ fn main() {
             OnEnter(GameState::GameOver),
             (cleanup::<CleanupOnGameOver>,),
         )
+        .add_systems(OnEnter(GameState::Playing), cleanup::<CleanupOnGameStart>)
         .add_systems(OnEnter(GameState::MainMenu), (cleanup::<CleanupOnRestart>,))
         .add_event::<CollisionEvent>()
         .init_state::<GameState>()
@@ -79,6 +81,8 @@ fn main() {
 
     #[cfg(feature = "server")]
     app.add_plugins((server::ServerPlugin,));
+
+    app.add_plugins(crate::shared::SharedPlugin); // Order of plugin initialization matters
 
     app.run();
 }
@@ -142,6 +146,9 @@ struct CleanupOnGameOver;
 
 #[derive(Component)]
 struct CleanupOnRestart;
+
+#[derive(Component)]
+struct CleanupOnGameStart;
 
 fn cleanup<T: Component>(mut cmd: Commands, e: Query<(Entity, &T)>) {
     e.iter().for_each(|(e, _)| {
@@ -266,7 +273,7 @@ fn wrap_around(
     });
 }
 
-#[derive(Component)]
+#[derive(Component, PartialEq, serde::Deserialize, Serialize)]
 struct Velocity {
     x: f32,
     y: f32,
