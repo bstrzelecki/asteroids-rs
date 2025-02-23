@@ -13,9 +13,8 @@ use rust_i18n::t;
 use crate::asteroid::{AsteroidSpawner, LargeAsteroid};
 use crate::player::{PlayerId, PlayerSpawner, ProjectileSprite, ScoreMarker};
 use crate::{
-    CircleCollider, CleanupOnGameOver, CleanupOnGameStart, GameState, JoinGame,
-    LARGE_ASTEROID_RADIUS, SERVER_ADDR, SMALL_ASTEROID_RADIUS, ServerAddress, Velocity,
-    WrapTimeout, shared,
+    CircleCollider, CleanupOnGameStart, GameState, JoinGame, LARGE_ASTEROID_RADIUS, SERVER_ADDR,
+    SMALL_ASTEROID_RADIUS, ServerAddress, Velocity, shared,
 };
 
 pub struct ClientPlugin;
