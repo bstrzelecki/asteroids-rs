@@ -1,11 +1,16 @@
 use std::time::Duration;
 
 use bevy::prelude::*;
-use lightyear::prelude::*;
+use client::{ComponentSyncMode, LerpFn};
+use lightyear::{prelude::*, utils::bevy::TransformLinearInterpolation};
 
 use serde::{Deserialize, Serialize};
 
-use crate::{Velocity, asteroid::LargeAsteroid, player::PlayerId};
+use crate::{
+    Velocity,
+    asteroid::LargeAsteroid,
+    player::{PlayerId, ScoreMarker},
+};
 
 pub struct SharedPlugin;
 
@@ -41,9 +46,12 @@ impl Plugin for SharedPlugin {
             mode: ChannelMode::OrderedReliable(ReliableSettings::default()),
             ..default()
         });
-        app.register_component::<Transform>(ChannelDirection::ServerToClient);
+        app.register_component::<Transform>(ChannelDirection::ServerToClient)
+            .add_interpolation(ComponentSyncMode::Full)
+            .add_interpolation_fn(TransformLinearInterpolation::lerp);
         app.register_component::<Velocity>(ChannelDirection::ServerToClient);
         app.register_component::<LargeAsteroid>(ChannelDirection::ServerToClient);
         app.register_component::<PlayerId>(ChannelDirection::ServerToClient);
+        app.register_component::<ScoreMarker>(ChannelDirection::ServerToClient);
     }
 }

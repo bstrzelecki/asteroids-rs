@@ -6,7 +6,8 @@ use bevy::{prelude::*, render::camera::ScalingMode};
 use bevy_rand::plugin::EntropyPlugin;
 use bevy_spatial::kdtree::KDTree2;
 use bevy_spatial::{AutomaticUpdate, SpatialAccess, SpatialStructure, TransformMode};
-use leafwing_input_manager::plugin::InputManagerPlugin;
+use leafwing_input_manager::prelude::*;
+use lightyear::prelude::*;
 use particles::ParticlePlugin;
 use player::PlayerPlugin;
 use serde::Serialize;
@@ -44,6 +45,7 @@ fn main() {
     app.add_plugins(DefaultPlugins)
         .add_plugins((
             InputManagerPlugin::<player::PlayerAction>::default(),
+            InputPlugin::<player::PlayerAction>::default(),
             EntropyPlugin::<RngType>::default(),
             AutomaticUpdate::<SpatialMarker>::new()
                 .with_frequency(Duration::from_millis(16))

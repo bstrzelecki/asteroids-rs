@@ -11,7 +11,7 @@ use lightyear::{
 use rust_i18n::t;
 
 use crate::asteroid::{AsteroidSpawner, LargeAsteroid};
-use crate::player::{PlayerId, PlayerSpawner};
+use crate::player::{PlayerId, PlayerSpawner, ProjectileSprite, ScoreMarker};
 use crate::{
     CircleCollider, CleanupOnGameOver, CleanupOnGameStart, GameState, JoinGame,
     LARGE_ASTEROID_RADIUS, SERVER_ADDR, SMALL_ASTEROID_RADIUS, ServerAddress, Velocity,
@@ -57,6 +57,7 @@ impl Plugin for ClientPlugin {
                     update_client_config.run_if(in_state(GameState::MainMenu)),
                     wait_for_start.run_if(in_state(GameState::Lobby)),
                     on_asteroid_spawn,
+                    on_bullet_spawn,
                     on_player_spawn.run_if(in_state(GameState::Playing)),
                 ),
             );
@@ -94,7 +95,10 @@ fn on_join_lobby(mut cmd: Commands) {
 
 fn on_asteroid_spawn(
     mut events: EventReader<EntitySpawnEvent>,
-    asteroids: Query<(&Transform, &Velocity, Option<&LargeAsteroid>), Without<PlayerId>>,
+    asteroids: Query<
+        (&Transform, &Velocity, Option<&LargeAsteroid>),
+        (Without<PlayerId>, Without<ScoreMarker>),
+    >,
     mut cmd: Commands,
     spawner: Single<&AsteroidSpawner>,
 ) {
@@ -123,6 +127,22 @@ fn on_player_spawn(
         if let Ok(_entity) = asteroids.get(event.entity()) {
             cmd.entity(event.entity())
                 .insert((spawner.player_client(),));
+        }
+    }
+}
+
+fn on_bullet_spawn(
+    mut events: EventReader<EntitySpawnEvent>,
+    asteroids: Query<(&Transform, &Velocity), With<ScoreMarker>>,
+    mut cmd: Commands,
+    material: Res<ProjectileSprite>,
+) {
+    for event in events.read() {
+        if let Ok(_entity) = asteroids.get(event.entity()) {
+            cmd.entity(event.entity()).insert((
+                Mesh2d(material.1.clone()),
+                MeshMaterial2d(material.0.clone()),
+            ));
         }
     }
 }

@@ -1,10 +1,10 @@
 use bevy::{prelude::*, time::Timer};
+use client::InputManager;
 use leafwing_input_manager::{
     Actionlike, InputManagerBundle,
     prelude::{ActionState, InputMap},
 };
-use lightyear::prelude::server::Replicate;
-use lightyear::server;
+use lightyear::{client::input::native::InputSystemSet, prelude::*};
 use serde::{Deserialize, Serialize};
 use strum::{EnumIter, IntoEnumIterator};
 
@@ -34,16 +34,24 @@ pub enum PlayerAction {
     Forward,
     Shoot,
     Rotate(i8),
+    None,
 }
 
 impl Plugin for PlayerPlugin {
     fn build(&self, app: &mut App) {
         app.add_systems(Startup, setup)
-            .add_systems(OnEnter(GameState::Playing), game_setup)
+            .add_systems(
+                OnEnter(GameState::Playing),
+                (game_setup, host_setup.run_if(is_server)).chain(),
+            )
+            .add_systems(
+                FixedPreUpdate,
+                input_passthrough.in_set(InputSystemSet::BufferInputs),
+            )
             .add_systems(
                 Update,
                 (
-                    player_input,
+                    player_input.run_if(is_server),
                     apply_shadow,
                     shoot_projectile,
                     resolve_bullet_collisions,
@@ -57,7 +65,7 @@ impl Plugin for PlayerPlugin {
 }
 
 #[derive(Resource)]
-struct ProjectileSprite(Handle<ColorMaterial>, Handle<Mesh>);
+pub struct ProjectileSprite(pub Handle<ColorMaterial>, pub Handle<Mesh>);
 
 #[derive(Component, PartialEq, Serialize, Deserialize)]
 pub struct PlayerId(pub u64);
@@ -99,10 +107,13 @@ fn setup(
     let mat = materials.add(Color::linear_rgb(256.0, 0.0, 0.0));
     cmd.spawn(PlayerSpawner::new(player_mesh.clone(), mat.clone()));
 }
+fn host_setup(mut cmd: Commands, spawner: Single<&PlayerSpawner>, e: Single<Entity, With<Player>>) {
+    cmd.entity(*e).insert(spawner.player_client());
+}
 
 fn game_setup(mut cmd: Commands, spawner: Single<&PlayerSpawner>) {
     cmd.spawn((
-        spawner.player_client(),
+        //spawner.player_client(),
         Transform::from_xyz(WINDOW_WIDTH / 2.0, WINDOW_HEIGHT / 2.0, 0.0),
         Velocity { x: 0.0, y: 0.0 },
         Player::default(),
@@ -110,7 +121,7 @@ fn game_setup(mut cmd: Commands, spawner: Single<&PlayerSpawner>) {
         CircleCollider::new(15.0),
         CleanupOnGameOver,
         PlayerId(0),
-        Replicate::default(),
+        server::Replicate::default(),
     ));
     for shadow in PlayerShadow::iter() {
         cmd.spawn((
@@ -150,6 +161,26 @@ impl Player {
     }
 }
 
+fn input_passthrough(
+    tick_manager: Res<TickManager>,
+    mut input_manager: ResMut<InputManager<PlayerAction>>,
+    player: Option<Single<&ActionState<PlayerAction>, With<Player>>>,
+) {
+    if player.is_none() {
+        return;
+    }
+    let player = player.unwrap();
+    let tick = tick_manager.tick();
+    let mut some = false;
+    for key in player.get_pressed() {
+        input_manager.add_input(key, tick);
+        some = true;
+    }
+    if !some {
+        input_manager.add_input(PlayerAction::None, tick);
+    }
+}
+
 pub fn player_input(
     player: Single<(&mut Velocity, &mut Transform, &ActionState<PlayerAction>), With<Player>>,
     time: Res<Time>,
@@ -171,7 +202,7 @@ pub fn player_input(
     }
 }
 
-#[derive(Component)]
+#[derive(Component, PartialEq, PartialOrd, Serialize, Deserialize)]
 pub struct ScoreMarker;
 
 fn shoot_projectile(

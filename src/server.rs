@@ -1,7 +1,7 @@
 use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
-use bevy::prelude::*;
 use bevy::window::PrimaryWindow;
+use bevy::{prelude::*, transform};
 use bevy_egui::{EguiContext, egui};
 use egui::Align2;
 use lightyear::prelude::server::Replicate;
@@ -9,17 +9,20 @@ use lightyear::prelude::*;
 use lightyear::server::events::{ConnectEvent, DisconnectEvent};
 use rust_i18n::t;
 use server::{
-    IoConfig, NetConfig, NetcodeConfig, ServerCommands, ServerConfig, ServerPlugins,
+    InputEvent, IoConfig, NetConfig, NetcodeConfig, ServerCommands, ServerConfig, ServerPlugins,
     ServerTransport,
 };
 
-use crate::player::{PlayerId, PlayerSpawner};
+use crate::player::{PlayerAction, PlayerId, PlayerSpawner, ProjectileSprite, ScoreMarker};
 use crate::shared::{DefaultChannel, StartGameMessage};
+use crate::{
+    ACC_SPEED, CircleCollider, CleanupOnGameOver, MAX_VELOCITY, PROJECTILE_SPEED, ROTATION_SPEED,
+    Velocity, WINDOW_HEIGHT, WINDOW_WIDTH, WrapTimeout,
+};
 use crate::{
     GameState, HostGame, SERVER_ADDR, ServerAddress,
     shared::{self, SERVER_REPLICATION_INTERVAL},
 };
-use crate::{Velocity, WINDOW_HEIGHT, WINDOW_WIDTH};
 
 pub struct ServerPlugin;
 
@@ -53,6 +56,8 @@ impl Plugin for ServerPlugin {
                 OnEnter(GameState::Playing),
                 spawn_player_for_each_connection,
             )
+            .add_systems(FixedUpdate, handle_player_inputs.run_if(is_server))
+            .add_observer(shoot_projectile)
             .add_systems(
                 Update,
                 (
@@ -88,6 +93,64 @@ fn spawn_player_for_each_connection(
             Replicate::default(),
         ));
     }
+}
+
+fn handle_player_inputs(
+    mut inputs: EventReader<InputEvent<PlayerAction>>,
+    mut players: Query<(&PlayerId, Entity, &mut Transform, &mut Velocity)>,
+    mut cmd: Commands,
+    time: Res<Time>,
+) {
+    for input in inputs.read() {
+        if input.input().is_none() {
+            continue;
+        }
+        let action_state = input.input().as_ref().unwrap();
+        let player = players
+            .iter_mut()
+            .find(|it| it.0.0 == input.from().to_bits());
+        if let Some((_, e, mut transform, mut velocity)) = player {
+            let direction = transform.rotation * Vec3::Y;
+            let translation = direction * ACC_SPEED * time.delta().as_secs_f32();
+            match action_state {
+                PlayerAction::Forward => velocity.update(translation.xy()),
+                PlayerAction::Shoot => cmd.trigger(NetworkPlayerShoot(e)),
+                PlayerAction::Rotate(sign) => {
+                    transform.rotate_z(-1.0 * *sign as f32 * ROTATION_SPEED * time.delta_secs())
+                }
+                PlayerAction::None => (),
+            }
+            velocity.max(MAX_VELOCITY);
+        }
+    }
+}
+
+#[derive(Event)]
+struct NetworkPlayerShoot(Entity);
+
+fn shoot_projectile(
+    trigger: Trigger<NetworkPlayerShoot>,
+    players: Query<(&Transform, &Velocity), With<PlayerId>>,
+    mut cmd: Commands,
+    material: Res<ProjectileSprite>,
+) {
+    let id = trigger.event().0;
+    let (transform, velocity) = players.get(id).unwrap();
+    let direction = transform.rotation * Vec3::Y;
+    cmd.spawn((
+        Transform::from_translation(transform.translation),
+        Mesh2d(material.1.clone()),
+        MeshMaterial2d(material.0.clone()),
+        Velocity {
+            x: velocity.x + direction.x * PROJECTILE_SPEED,
+            y: velocity.y + direction.y * PROJECTILE_SPEED,
+        },
+        WrapTimeout(1),
+        CircleCollider::new(10.0),
+        ScoreMarker,
+        CleanupOnGameOver,
+        Replicate::default(),
+    ));
 }
 
 fn handle_connections(
