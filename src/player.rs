@@ -53,7 +53,7 @@ impl Plugin for PlayerPlugin {
                 (
                     player_input.run_if(is_server),
                     apply_shadow,
-                    shoot_projectile,
+                    shoot_projectile.run_if(is_server),
                     resolve_bullet_collisions,
                     resolve_player_collisions,
                     clear_player_grace,
@@ -164,15 +164,25 @@ impl Player {
 fn input_passthrough(
     tick_manager: Res<TickManager>,
     mut input_manager: ResMut<InputManager<PlayerAction>>,
-    player: Option<Single<&ActionState<PlayerAction>, With<Player>>>,
+    player: Option<Single<(&mut Player, &ActionState<PlayerAction>)>>,
+    time: Res<Time>,
 ) {
     if player.is_none() {
         return;
     }
-    let player = player.unwrap();
+    let (mut timer, player) = player.unwrap().into_inner();
     let tick = tick_manager.tick();
     let mut some = false;
+    timer.projectile_spawn_delay.tick(time.delta());
     for key in player.get_pressed() {
+        if key == PlayerAction::Shoot {
+            if timer.projectile_spawn_delay.finished() {
+                timer.projectile_spawn_delay.reset();
+                input_manager.add_input(key, tick);
+                some = true;
+            }
+            continue;
+        }
         input_manager.add_input(key, tick);
         some = true;
     }
