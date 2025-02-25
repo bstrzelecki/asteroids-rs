@@ -41,7 +41,7 @@ fn net_config(address: SocketAddr, id: u64) -> NetConfig {
 
 impl Plugin for ClientPlugin {
     fn build(&self, app: &mut App) {
-        let id = rand::random::<u64>(); // Use proper rng
+        let id = rand::random::<u64>();
         let config = ClientConfig {
             shared: shared::shared_config(),
             net: net_config(SERVER_ADDR, id),
@@ -164,7 +164,7 @@ fn update_client_config(mut client_config: ResMut<ClientConfig>, address: Res<Se
                 .unwrap_or(IpAddr::V4(Ipv4Addr::LOCALHOST)),
             address.port,
         );
-        let id = rand::random::<u64>(); // Use proper rng
+        let id = rand::random::<u64>();
         client_config.net = net_config(address, id)
     }
 }

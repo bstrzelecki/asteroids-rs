@@ -5,7 +5,8 @@ use bevy_hanabi::{ParticleEffect, ParticleEffectBundle};
 use bevy_rand::{global::GlobalEntropy, prelude::Entropy, traits::ForkableRng};
 use lightyear::prelude::is_server;
 use lightyear::prelude::server::Replicate;
-use rand::{Rng, distr::Distribution, rngs::ThreadRng};
+use rand::prelude::Rng;
+use rand_distr::Distribution;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -105,37 +106,35 @@ impl AsteroidSpawner {
         )
     }
 
-    fn velocity(&self, mut rng: &mut ThreadRng) -> Velocity {
-        let velocity = rand::distr::Uniform::new(-3.0, 3.0).unwrap();
+    fn velocity(&self, rng: &mut Entropy<RngType>) -> Velocity {
+        let velocity = rand_distr::Uniform::new(-3.0, 3.0);
         Velocity {
-            x: velocity.sample(&mut rng),
-            y: velocity.sample(&mut rng),
+            x: velocity.sample(&mut *rng),
+            y: velocity.sample(&mut *rng),
         }
     }
 
-    fn spawn(&self, cmd: &mut Commands, _rng: &mut Entropy<RngType>) {
-        // TODO use proper generation
-        let mut rng = rand::rng();
-        let screen_distr_x = rand::distr::Uniform::new(0.0, WINDOW_WIDTH).unwrap();
-        let screen_distr_y = rand::distr::Uniform::new(0.0, WINDOW_HEIGHT).unwrap();
-        let axis = rng.random_bool(0.5);
-        let is_large = rng.random_bool(0.2);
+    fn spawn(&self, cmd: &mut Commands, rng: &mut Entropy<RngType>) {
+        let screen_distr_x = rand_distr::Uniform::new(0.0, WINDOW_WIDTH);
+        let screen_distr_y = rand_distr::Uniform::new(0.0, WINDOW_HEIGHT);
+        let axis = rng.gen_bool(0.5);
+        let is_large = rng.gen_bool(0.2);
         let mut asteroid = cmd.spawn(self.asteroid(
             Transform::from_xyz(
                 if axis {
-                    screen_distr_x.sample(&mut rng)
+                    screen_distr_x.sample(&mut *rng)
                 } else {
                     0.0
                 },
                 if !axis {
-                    screen_distr_y.sample(&mut rng)
+                    screen_distr_y.sample(&mut *rng)
                 } else {
                     0.0
                 },
                 0.0,
             ),
             is_large,
-            self.velocity(&mut rng),
+            self.velocity(&mut *rng),
             false,
         ));
         if is_large {
@@ -183,8 +182,7 @@ fn divide_on_collision(
     mut cmd: Commands,
     mut spawner: Query<(&AsteroidSpawner, &mut Entropy<RngType>)>,
 ) {
-    let mut rng = rand::rng();
-    let (spawner, mut _rng) = spawner.single_mut();
+    let (spawner, mut rng) = spawner.single_mut();
     cmd.spawn(spawner.asteroid(trigger.0, false, spawner.velocity(&mut rng), true));
     cmd.spawn(spawner.asteroid(trigger.0, false, spawner.velocity(&mut rng), true));
 }
